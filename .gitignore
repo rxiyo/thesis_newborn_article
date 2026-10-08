@@ -38,7 +38,10 @@ NAIP.7z
 venv/
 .env
 logs/
-dataset/
+dataset/*
+!dataset/per_year/
+dataset/per_year/*
+!dataset/per_year/arxiv_cs_metadata_2022_with_scores.csv
 Llama-3.3-8B-Instruct/
 NAIP_local/
 last/
