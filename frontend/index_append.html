@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LoRA Paper Score Predictor</title>
+  <style>
+    :root {
+      --primary-color: #2563eb;
+      --primary-hover: #1d4ed8;
+      --tab-bg: #eef2ff;
+      --tab-active-bg: #2563eb;
+      --tab-active-text: #fff;
+      --tab-inactive-text: #1e293b;
+      --tab-inactive-bg: #eef2ff;
+      --tab-border: #cbd5e1;
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+      --error-color: #ef4444;
+      --success-bg: #eff6ff;
+      --success-text: #1e40af;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* .container {
+      width: 100%;
+      max-width: 640px;
+      margin: 2rem;
+      background: var(--card-bg);
+      padding: 2.5rem 1.5rem 2rem 1.5rem;
+      border-radius: 18px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      position: relative;
+      transition: box-shadow 0.2s;
+    } */
+    .container {
+        width: 96vw;
+        max-width: 780px;
+        min-width: 0;
+        box-sizing: border-box;
+        margin: 5vw auto 0 auto;
+        background: var(--card-bg);
+        padding: max(2vh,1rem) max(4vw,1rem) max(2vh,1rem) max(4vw,1rem);
+        border-radius: 24px;
+        box-shadow: var(--shadow-strong);
+        transition: box-shadow 0.17s;
+        position: relative;
+    }
+    /* 适配大屏，更“居中” */
+    @media (min-width: 1200px) {
+        .container {
+        width: 55vw;
+        max-width: 880px;
+        margin-top: 3vw;
+        padding: 2.8rem 2.2rem 2.3rem 2.2rem;
+        }
+    }
+    /* 适配中屏 */
+    @media (max-width: 900px) {
+        .container { max-width: 99vw; width: 99vw; padding: 2.1rem 0.7rem 2rem 0.7rem;}
+    }
+    /* 适配小屏 */
+    @media (max-width: 600px) {
+        .container { padding: 1.05rem 0.1rem;}
+        h1 { font-size: 1.2rem;}
+        .kw-result, .result { font-size: .97rem;}
+    }
+    @media (max-width: 480px) {
+        html, body { background: #fff; }
+        .container {
+        width: 100vw;
+        max-width: 100vw;
+        min-width: 0;
+        border-radius: 0;
+        margin: 0;
+        padding: 0.6rem 0.1rem 1.2rem 0.1rem;
+        box-shadow: none;
+        }
+        h1 { font-size: 1.12rem; }
+        .kw-result, .result { font-size: .94rem;}
+        input, textarea, button { font-size: 0.95rem;}
+        .tabs { flex-direction: column; gap: 2px;}
+        .tab-btn { width: 100%; }
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 1.8rem;
+      font-weight: 800;
+      text-align: center;
+      color: var(--text-main);
+      letter-spacing: -0.025em;
+    }
+
+    p.subtitle {
+      text-align: center;
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+      font-size: 0.96rem;
+    }
+
+    /* ------- Tabs -------- */
+    .tabs {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      margin-bottom: 2rem;
+      gap: 0.15rem;
+      border-bottom: 2px solid var(--tab-border);
+    }
+    .tab-btn {
+      background: var(--tab-inactive-bg);
+      color: var(--tab-inactive-text);
+      padding: 0.65rem 1.3rem;
+      border: none;
+      border-top-left-radius: 13px;
+      border-top-right-radius: 13px;
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0;
+      cursor: pointer;
+      transition: background 0.18s, color 0.18s;
+      border-bottom: 2.5px solid transparent;
+      outline: none;
+    }
+    .tab-btn.active {
+      background: var(--primary-color);
+      color: var(--tab-active-text);
+      border-bottom: 2.5px solid var(--primary-color);
+      box-shadow: 0px 1px 5px rgba(37,99,235,0.06);
+      position: relative;
+      z-index: 1;
+    }
+    .tab-btn:not(.active):hover {
+      background: #e0e7ff;
+      color: var(--primary-hover);
+    }
+
+    /* --- Forms and Controls --- */
+    label {
+      display: block;
+      margin-top: 1.25rem;
+      font-weight: 600;
+      font-size: 0.94rem;
+      color: var(--text-main);
+    }
+
+    input[type="text"],
+    textarea {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      margin-top: 0.5rem;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 1rem;
+      font-family: inherit;
+      box-sizing: border-box;
+      transition: all 0.2s ease;
+      background-color: #fff;
+    }
+
+    input[type="text"]:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.13);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 120px;
+    }
+
+    button[type="submit"],
+    button[type="button"].main-btn {
+      width: 100%;
+      margin-top: 2rem;
+      padding: 0.87rem 1.6rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: white;
+      background-color: var(--primary-color);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(.4,0,.2,1),box-shadow 0.13s;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      outline: none;
+    }
+
+    button[type="submit"]:hover,
+    button[type="button"].main-btn:hover {
+      background-color: var(--primary-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.11);
+    }
+
+    button[type="button"].main-btn:active,
+    button[type="submit"]:active {
+      transform: translateY(0);
+    }
+
+    .progress {
+      margin-top: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    #progress-text,
+    #kw-progress-text {
+      font-size: 0.89rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #f1f5f9;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #60a5fa, #2563eb);
+      transition: width 0.3s ease;
+    }
+
+    .result, .kw-result {
+      margin-top: 1.5rem;
+      padding: 1.13rem 1.1rem 1rem 1.1rem;
+      border-radius: 8px;
+      text-align: left;
+      font-size: 1.05rem;
+      background-color: var(--success-bg);
+      color: var(--success-text);
+      border: 1px solid rgba(37, 99, 235, 0.08);
+      animation: fadeIn 0.36s;
+      word-break: break-word;
+    }
+
+    .result:empty, .kw-result:empty {
+      display: none;
+    }
+
+    .error {
+      background-color: #fef2f2 !important;
+      color: var(--error-color) !important;
+      border-color: #fee2e2 !important;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .kw-hint {
+      text-align: center;
+      font-size: 0.97rem;
+      margin: 0.5rem 0 1.3rem 0;
+      color: var(--text-muted);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(14px);}
+      to { opacity: 1; transform: translateY(0);}
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        margin: 1rem;
+        padding: 1.1rem;
+      }
+      .tabs {
+        gap: 0.06rem;
+      }
+      .tab-btn {
+        font-size: 0.97rem;
+        padding: 0.49rem 0.75rem;
+      }
+      h1 {
+        font-size: 1.12rem;
+      }
+      .result, .kw-result {
+        font-size: 0.99rem;
+      }
+    }
+
+    .kw-result {
+    padding: 1.1rem 1rem 1.2rem 1rem;
+    background: #eef4ff;
+    border-radius: 12px;
+    border: 1px solid #c7ddfa;
+    box-shadow: 0 2px 8px -4px rgba(37,99,235,0.04);
+    margin-top: 2rem;
+    font-size: 1.04rem;
+    }
+    .kw-card-head {
+    margin-bottom: 0.48rem;
+    font-size: 1.01rem;
+    }
+    .kw-lab { color:#254bb5; font-weight:bold;}
+    .kw-keyword code {
+    background: #dde8fa;
+    border-radius: 5px;
+    padding: 1px 6px 1px 6px;
+    font-size: 0.97em;
+    }
+    .kw-tip {
+    color:#8793bc;
+    font-size:0.94em;
+    margin-left: 0.4em;
+    }
+    .kw-row {
+    margin: 0.7em 0 0.2em 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    }
+    .kw-label {
+    color: #475569;
+    font-size: 0.98em;
+    font-weight: 600;
+    margin-bottom: 2px;
+    display: block;
+    }
+    .kw-score {
+    font-size: 1.22em;
+    color: #1472ee;
+    margin-left:0.15em;
+    font-weight: 700;
+    letter-spacing:0.01em;
+    }
+    .kw-title {
+    font-size: 1.06em;
+    font-weight: 600;
+    line-height: 1.46;
+    color: #122263;
+    }
+    .kw-authors, .kw-pub {
+    color: #3b4764;
+    font-size: 0.99em;
+    line-height:1.45;
+    }
+    .kw-abs-block {
+    width: 100%;
+    }
+    .kw-abs-content {
+    color: #22334b;
+    font-size: 0.97em;
+    margin-top: 1px;
+    line-height: 1.66;
+    overflow: hidden;
+    transition: max-height 0.18s;
+    }
+
+    .kw-abs-content.collapsed {
+    max-height: 9.6em; /* (MAX_ABS_LINES * line-height). 6*1.6em =9.6em */
+    position: relative;
+    }
+    .abs-more-btn {
+    margin-top: 6px;
+    background: #e1eaff;
+    color: #134bd8;
+    padding: 4px 14px;
+    font-size: 0.97em;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    float: right;
+    box-shadow: none;
+    font-weight: 500;
+    outline: none;
+    transition: background 0.20s;
+    }
+    .abs-more-btn:hover {
+    background: #d5dcf8;
+    }
+
+    @media (max-width: 540px) {
+    .kw-result, .result {
+        padding: 0.7rem 0.4rem 1rem 0.5rem;
+        font-size: 0.97rem;
+    }
+    .kw-abs-content { font-size:0.98em;}
+    .kw-label { font-size:0.99em;}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="tabs">
+      <button id="tab-predict" class="tab-btn active" type="button">Predict Score</button>
+      <button id="tab-search" class="tab-btn" type="button">Search Top Paper</button>
+    </div>
+    
+    <!-- Predict Page -->
+    <div id="page-predict">
+      <h1>Paper Score Predictor</h1>
+      <p class="subtitle">Enter your paper details to estimate its impact score</p>
+      <form id="predict-form">
+        <label for="title">Paper Title</label>
+        <input id="title" name="title" type="text" placeholder="e.g. LoRA: Low-Rank Adaptation of Large Language Models" required />
+
+        <label for="abstract">Paper Abstract</label>
+        <textarea id="abstract" name="abstract" rows="8" placeholder="Paste the full abstract here..." required></textarea>
+  
+        <button type="submit" class="main-btn">Predict Score</button>
+      </form>
+  
+      <div id="progress" class="progress hidden">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <span id="progress-text">Running inference…</span>
+      </div>
+      <div id="output" class="result"></div>
+    </div>
+
+    <!-- Search Page -->
+    <div id="page-search" class="hidden">
+      <h1>Search Top Paper by Keyword</h1>
+      <p class="subtitle">Find the best new paper in the last 7 days by your keyword</p>
+      
+      <form id="kw-form" autocomplete="off">
+        <label for="keyword">Keyword</label>
+        <input id="keyword" name="keyword" type="text" placeholder="e.g. diffusion, graph neural..." autocomplete="off" required />
+        <div class="kw-hint">Enter an English keyword (in title, abstract or authors, last 7 days)</div>
+        <button id="kw-search-btn" type="submit" class="main-btn">Search & Predict Top Paper</button>
+      </form>
+  
+      <div id="kw-progress" class="progress hidden">
+        <div class="progress-bar">
+          <div class="progress-fill" id="kw-progress-fill"></div>
+        </div>
+        <span id="kw-progress-text">Searching…</span>
+      </div>
+      <div id="kw-output" class="kw-result"></div>
+    </div>
+  </div>
+<script>
+const API_URL = 'http://10.249.41.88:9000/predict';
+const KW_API_URL = 'http://10.249.41.88:9000/arxiv_keyword_best';
+
+const tabPredict = document.getElementById('tab-predict');
+const tabSearch = document.getElementById('tab-search');
+const pagePredict = document.getElementById('page-predict');
+const pageSearch = document.getElementById('page-search');
+const container = document.querySelector('.container');
+// Tab 切换
+tabPredict.addEventListener('click', () => {
+  tabPredict.classList.add('active');
+  tabSearch.classList.remove('active');
+  pagePredict.classList.remove('hidden');
+  pageSearch.classList.add('hidden');
+  // 滚回顶部
+  window.scrollTo({top:0, left:0, behavior:'smooth'});
+});
+
+tabSearch.addEventListener('click', () => {
+  tabSearch.classList.add('active');
+  tabPredict.classList.remove('active');
+  pageSearch.classList.remove('hidden');
+  pagePredict.classList.add('hidden');
+  window.scrollTo({top:0, left:0, behavior:'smooth'});
+});
+
+// 预测
+const form = document.getElementById('predict-form');
+const output = document.getElementById('output');
+const progress = document.getElementById('progress');
+const progressFill = document.getElementById('progress-fill');
+const progressText = document.getElementById('progress-text');
+
+let progressTimer;
+
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  output.textContent = '';
+  output.className = 'result';
+  progressText.textContent = 'Analyzing content...';
+  progressFill.style.width = '0%';
+  progress.classList.remove('hidden');
+
+  let progressValue = 0;
+  progressTimer = setInterval(() => {
+    progressValue = Math.min(progressValue + 5, 95);
+    progressFill.style.width = `${progressValue}%`;
+  }, 200);
+
+  const payload = {
+    title: form.title.value.trim(),
+    abstract: form.abstract.value.trim(),
+  };
+
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      let errorMsg = "An error occurred";
+      if (data.detail && Array.isArray(data.detail)) {
+        errorMsg = data.detail.map(d => d.msg).join(", ");
+      } else if (typeof data.detail === 'string') {
+        errorMsg = data.detail;
+      }
+      throw new Error(errorMsg);
+    }
+
+    progressFill.style.width = '100%';
+    progressText.textContent = 'Analysis complete';
+    output.textContent = `Predicted Score: ${data.score}`;
+    output.className = 'result';
+
+  } catch (err) {
+    progressFill.style.width = '100%';
+    progressText.textContent = 'Inference failed';
+    output.textContent = `Error: ${err.message}`;
+    output.className = 'result error';
+  } finally {
+    clearInterval(progressTimer);
+    setTimeout(() => progress.classList.add('hidden'), 1200);
+  }
+});
+
+// Search
+const MAX_KEYWORD_LEN = 32;
+const ALLOWED_REGEX = /^[a-zA-Z0-9 _\-,.]+$/;
+const kwForm = document.getElementById('kw-form');
+const kwInput = document.getElementById('keyword');
+const kwBtn = document.getElementById('kw-search-btn');
+const kwProgress = document.getElementById('kw-progress');
+const kwProgressFill = document.getElementById('kw-progress-fill');
+const kwProgressText = document.getElementById('kw-progress-text');
+const kwOutput = document.getElementById('kw-output');
+let kwProgressTimer;
+
+kwForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const kw = kwInput.value.trim();
+  kwOutput.innerHTML = '';
+  kwOutput.className = 'kw-result';
+
+  if (kw.length < 2) {
+    kwOutput.textContent = 'Please enter at least 2 characters as keyword.';
+    kwOutput.classList.add('error');
+    return;
+  }
+  if (kw.length > MAX_KEYWORD_LEN) {
+    kwOutput.textContent = `Keyword too long (max ${MAX_KEYWORD_LEN} characters).`;
+    kwOutput.classList.add('error');
+    return;
+  }
+  if (!ALLOWED_REGEX.test(kw)) {
+    kwOutput.textContent = 'Only English letters, numbers, spaces, dash and comma allowed.';
+    kwOutput.classList.add('error');
+    return;
+  }
+
+  // 进度条UI
+  kwProgressText.textContent = 'Searching and scoring...';
+  kwProgressFill.style.width = '0%';
+  kwProgress.classList.remove('hidden');
+
+  let kwProgressValue = 0;
+  kwProgressTimer = setInterval(() => {
+    kwProgressValue = Math.min(kwProgressValue + 5.5, 96);
+    kwProgressFill.style.width = `${kwProgressValue}%`;
+  }, 180);
+
+  let safeEncode = encodeURIComponent(kw);
+
+  try {
+    const url = `${KW_API_URL}?keyword=${safeEncode}`;
+    const resp = await fetch(url, { method: 'GET' });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      throw new Error(data.msg || data.detail || 'Unknown error from backend.');
+    }
+
+    if (data.status !== "success" || !data.best_paper) {
+      throw new Error(data.msg || 'No matching papers found.');
+    }
+
+    kwProgressFill.style.width = '100%';
+    kwProgressText.textContent = 'Done';
+
+    const p = data.best_paper;
+    const esc = (s) => (s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // ----
+    const linkify = (txt) => 
+    (txt || '').replace(/(https?:\/\/[^\s)]+)/g, url =>
+        `<a href="${url}" target="_blank" rel="noopener" style="color:#1d4ed8;word-break:break-all;text-underline-offset:3px;">${url}</a>`);
+
+    // Abstract折叠（仅自动折叠长内容，点击展开/收起）
+    const MAX_ABS_LINES = 6;
+    const absId = 'abstract-' + Math.random().toString(36).slice(2);
+    const abstractHtml = `
+    <div class="kw-abs-block">
+        <div class="kw-abs-content" id="${absId}">${linkify(esc(p.abstract))}</div>
+        <button type="button" class="abs-more-btn" id="${absId}-btn" style="display:none;">Show more</button>
+    </div>
+    `;
+
+    kwOutput.innerHTML = `
+    <div class="kw-card-head">
+        <span class="kw-lab">Top result for:</span>
+        <span class="kw-keyword"><code>${esc(data.keyword)}</code></span>
+        <span class="kw-tip">(last week, score ranked)</span>
+    </div>
+
+    <div class="kw-row">
+        <span class="kw-label">Score</span>
+        <span class="kw-score">${typeof p.model_score === "number" ? p.model_score.toFixed(4) : esc(p.model_score)}</span>
+    </div>
+
+    <div class="kw-row kw-title-row">
+        <span class="kw-label">Title</span>
+        <span class="kw-title">${esc(p.title)}</span>
+    </div>
+
+    <div class="kw-row kw-auth-row">
+        <span class="kw-label">Authors</span>
+        <span class="kw-authors">${esc(p.authors)}</span>
+    </div>
+
+    <div class="kw-row kw-pub-row">
+        <span class="kw-label">Published</span>
+        <span class="kw-pub">${esc(p.published)}</span>
+    </div>
+
+    <div class="kw-row kw-abs-row">
+        <span class="kw-label">Abstract</span>
+        ${abstractHtml}
+    </div>
+    `;
+
+    kwOutput.className = 'kw-result';
+
+    // 自动折叠摘要长文本
+    setTimeout(() => {
+    const absDiv = document.getElementById(absId);
+    const btn = document.getElementById(absId + '-btn');
+    if(absDiv && btn){
+        const lineHeight = parseFloat(getComputedStyle(absDiv).lineHeight || '22');
+        const maxPx = MAX_ABS_LINES * lineHeight;
+        if(absDiv.scrollHeight > maxPx + 20){
+        absDiv.classList.add('collapsed');
+        btn.style.display = '';
+        let expanded = false;
+        btn.onclick = () => {
+            expanded = !expanded;
+            absDiv.classList.toggle('collapsed', !expanded);
+            btn.textContent = expanded ? "Show less" : "Show more";
+        };
+        }
+    }
+    }, 50);
+    // kwOutput.innerHTML = `
+    //   <div><b>Top result for: </b><code>${esc(data.keyword)}</code> (in last week, score ranked)</div>
+    //   <div style="margin-top:1rem;">
+    //     <b>Score:</b> <span style="font-size:1.08em;color:#0b59c2;font-weight:bold;">${typeof p.model_score === "number" ? p.model_score.toFixed(4) : p.model_score}</span>
+    //   </div>
+    //   <div style="margin-top:0.45rem;"><b>Title:</b> ${esc(p.title)}</div>
+    //   <div style="margin-top:0.4rem;"><b>Authors:</b> ${esc(p.authors)}</div>
+    //   <div style="margin-top:0.4rem;"><b>Published:</b> ${esc(p.published)}</div>
+    //   <div style="margin-top:0.4rem;"><b>Abstract:</b><br><span style="font-size:0.97em;">${esc(p.abstract)}</span></div>
+    // `;
+    kwOutput.className = 'kw-result';
+
+  } catch (err) {
+    kwProgressFill.style.width = '100%';
+    kwProgressText.textContent = 'Failed';
+    kwOutput.textContent = `Error: ${err.message}`;
+    kwOutput.className = 'kw-result error';
+  } finally {
+    clearInterval(kwProgressTimer);
+    setTimeout(() => kwProgress.classList.add('hidden'), 1200);
+  }
+});
+</script>
+</body>
+</html>

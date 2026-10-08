@@ -9,6 +9,7 @@ from retry import retry
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_openai import ChatOpenAI
 
+# 从一段参考文献文本中抽取每条文献的“论文标题”，忽略杂乱排版或编号。
 def _get_ref_list(text):
     messages = [
         SystemMessage(content="You are a researcher, who is good at reading academic paper, and familiar with all of the "
@@ -28,7 +29,7 @@ def _get_ref_list(text):
 
     return chat.batch([messages])[0].content
 
-
+# 根据论文标题与摘要，生成 3-5 个专业关键词。
 @retry(delay=6,)
 def get_chatgpt_keyword(title, abstract):
     messages = [
@@ -47,8 +48,7 @@ def get_chatgpt_keyword(title, abstract):
     return chat.batch([messages])[0].content
 
 
-
-
+# 从带编号（或其它格式）的章节标题中提取纯标题文本。
 def get_unnum_sectitle(sectitle):
 
     messages = [
@@ -62,6 +62,8 @@ def get_unnum_sectitle(sectitle):
 
 
     return chat.batch([messages])[0].content
+
+# 根据论文标题（可选摘要），找出研究领域（“topic key phrase”）
 @retry()
 def get_chatgpt_field(title, abstract=None, sys_content=None, usr_prompt=None, extra_prompt=True,model="gpt-3.5-turbo-0125",temperature=0):
 
@@ -92,6 +94,8 @@ def get_chatgpt_field(title, abstract=None, sys_content=None, usr_prompt=None, e
 
 
     return chat.batch([messages])[0].content
+
+# 生成 5 个具体的搜索关键词，用于文献检索，按相关度降序排列。
 @retry()
 def get_chatgpt_fields(title, abstract, extra_prompt=True,sys_content=None,usr_prompt=None):
 
@@ -138,7 +142,7 @@ def get_chatgpt_fields(title, abstract, extra_prompt=True,sys_content=None,usr_p
     return chat.batch([messages])[0].content
 
 
-
+# 输入论文首页文本（可能含作者、摘要、脚注等），若存在作者列出的关键词（如“Index Terms”），提取出来；否则返回 None。
 @retry(delay=6, )
 def extract_keywords_from_article_with_gpt(text):
     messages = [

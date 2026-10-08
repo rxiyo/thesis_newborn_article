@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LoRA Paper Score Predictor</title>
+  <style>
+    :root {
+      --primary-color: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+      --error-color: #ef4444;
+      --success-bg: #eff6ff;
+      --success-text: #1e40af;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 640px;
+      margin: 2rem;
+      background: var(--card-bg);
+      padding: 2.5rem;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 1.875rem;
+      font-weight: 800;
+      text-align: center;
+      color: var(--text-main);
+      letter-spacing: -0.025em;
+    }
+
+    p.subtitle {
+      text-align: center;
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+      font-size: 0.95rem;
+    }
+
+    label {
+      display: block;
+      margin-top: 1.25rem;
+      font-weight: 600;
+      font-size: 0.875rem;
+      color: var(--text-main);
+    }
+
+    input[type="text"],
+    textarea {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      margin-top: 0.5rem;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 1rem;
+      font-family: inherit;
+      box-sizing: border-box;
+      transition: all 0.2s ease;
+      background-color: #fff;
+    }
+
+    input[type="text"]:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 120px;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 2rem;
+      padding: 0.875rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: white;
+      background-color: var(--primary-color);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    button:hover {
+      background-color: var(--primary-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .progress {
+      margin-top: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    #progress-text {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #f1f5f9;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #60a5fa, #2563eb);
+      transition: width 0.3s ease;
+    }
+
+    .result {
+      margin-top: 1.5rem;
+      padding: 1.25rem;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 1.125rem;
+      background-color: var(--success-bg);
+      color: var(--success-text);
+      border: 1px solid rgba(37, 99, 235, 0.1);
+      animation: fadeIn 0.4s ease-out;
+    }
+
+    .result:empty {
+      display: none;
+    }
+
+    .error {
+      background-color: #fef2f2;
+      color: var(--error-color);
+      border-color: #fee2e2;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        margin: 1rem;
+        padding: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Paper Score Predictor</h1>
+    <p class="subtitle">Enter your paper details to estimate its impact score</p>
+
+    <form id="predict-form">
+      <label for="title">Paper Title</label>
+      <input id="title" name="title" type="text" placeholder="e.g. LoRA: Low-Rank Adaptation of Large Language Models" required />
+
+      <label for="abstract">Paper Abstract</label>
+      <textarea id="abstract" name="abstract" rows="8" placeholder="Paste the full abstract here..." required></textarea>
+
+      <button type="submit">Predict Score</button>
+    </form>
+
+    <div id="progress" class="progress hidden">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <span id="progress-text">Running inference…</span>
+    </div>
+
+    <div id="output" class="result"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById('predict-form');
+    const output = document.getElementById('output');
+    const progress = document.getElementById('progress');
+    const progressFill = document.getElementById('progress-fill');
+    const progressText = document.getElementById('progress-text');
+    const API_URL = 'http://10.250.254.99:9000/predict'; 
+
+    let progressTimer;
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      
+      // 重置 UI 状态
+      output.textContent = '';
+      output.className = 'result';
+      progressText.textContent = 'Analyzing content...';
+      progressFill.style.width = '0%';
+      progress.classList.remove('hidden');
+
+      let progressValue = 0;
+      progressTimer = setInterval(() => {
+        progressValue = Math.min(progressValue + 5, 95);
+        progressFill.style.width = `${progressValue}%`;
+      }, 200);
+
+      const payload = {
+        title: form.title.value.trim(),
+        abstract: form.abstract.value.trim(),
+      };
+
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          // 这里的逻辑修复了 setErrorMessage 未定义的问题
+          let errorMsg = "An error occurred";
+          if (data.detail && Array.isArray(data.detail)) {
+              // 提取后端返回的校验错误信息
+              errorMsg = data.detail.map(d => d.msg).join("; ");
+          } else if (typeof data.detail === 'string') {
+              errorMsg = data.detail;
+          }
+          
+          throw new Error(errorMsg); // 抛出错误进入 catch 统一处理 UI
+        }
+
+        // 成功处理
+        progressFill.style.width = '100%';
+        progressText.textContent = 'Analysis complete';
+        output.textContent = `Predicted Score: ${data.score}`;
+        output.className = 'result';
+
+      } catch (err) {
+        // 统一显示错误
+        progressFill.style.width = '100%';
+        progressText.textContent = 'Inference failed';
+        output.textContent = `Error: ${err.message}`;
+        output.className = 'result error';
+      } finally {
+        clearInterval(progressTimer);
+        setTimeout(() => progress.classList.add('hidden'), 1200);
+      }
+    });
+  </script>
+</body>
+</html>

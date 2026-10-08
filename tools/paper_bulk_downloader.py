@@ -10,34 +10,33 @@ from arxiv import SortCriterion, SortOrder
 import os
 import re
 from tqdm import tqdm
-from database.DBEntity import AuthorMapping, AoP, PaperMapping
-from retriever.Author import Author
-from retriever.arxiv_paper import Arxiv_paper, get_arxiv_id_from_url
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
+# from database.DBEntity import AuthorMapping, AoP, PaperMapping
+# from retriever.Author import Author
+# from retriever.arxiv_paper import Arxiv_paper, get_arxiv_id_from_url
+from sqlalchemy import create_engine, Column, Integer, String, Boolean
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
-from retriever.google_scholar_paper import Google_paper
-from retriever.semantic_scholar_paper import S2paper
+# from retriever.google_scholar_paper import Google_paper
+# from retriever.semantic_scholar_paper import S2paper
 
-from tools.gpt_util import *
+# from tools.gpt_util import *
+from retry import retry
 # d  {'representation learning': 111, 'meta-learning': 1, 'facial recognition': 6, 'vision transformer': 24, 'transfer learning': 131, 'image recognition': 15, 'action detection': 6, 'semantic segmentation': 51, 'speech recognition': 73, 'image segmentation': 56, 'sentiment analysis': 125, 'emotion recognition': 15, 'object detection': 220, 'image restoration': 10, 'question answering': 101, 'anomaly detection': 108, 'relation extraction': 20, 'adversarial attack': 71, 'speech synthesis': 13, 'object tracking': 31, 'document analysis and recognition': 2, 'superpixels': 5, 'instance segmentation': 11, 'time series analysis': 23, 'image retrieval': 25, 'image matching': 3, 'image editing': 9, 'depth estimation': 12, 'point cloud': 51, 'mask image modeling': 2, 'text generation': 45, 'image generation': 35, 'time series forecasting': 14, 'salient object detection': 5, 'saliency detection': 5, 'image clustering': 2, 'image enhancement': 14, 'diffusion model': 37, 'machine translation': 64, 'ocr': 11, 'image reconstruction': 27, 'image inpainting': 1, 'remote sensing': 83, 'cnn': 187, 'image quality assessment': 7, 'named entity recognition': 17, 'image captioning': 18, 'video object segmentation': 1, 'edge detection': 13, 'reinforcement learning': 285, 'contrastive learning': 20, 'image compression': 12, 'computer vision': 588, 'speech enhancement': 2, 'word embeddings': 45, 'language modelling': 233, 'text classification': 45, 'visual question answering': 21, 'optical character recognition': 9, 'domain adaptation': 62, 'video understanding': 4, 'text summarization': 24, 'image classification': 87, 'metric learning': 10}
 import requests
 import os.path
 import arxiv  # 1.4.3
 from tqdm import tqdm
 import re
+# from tools.PaperMapping import PaperMapping
+# from tools.Arxiv_paper import Arxiv_paper, get_arxiv_id_from_url
 
 Base = declarative_base()
-out_dir = r"E:\download_paper"
+out_dir = r"/Users/ruyi/Desktop/NAIP/dataset"
  
-engine = create_engine('xxxliteraturedatabase')
-
+# engine = create_engine('sqlite:////Users/ruyi/Desktop/NAIP/pdf_dir/pdf_db.db')
  
-Base.metadata.create_all(engine)
-
- 
-Session = sessionmaker(bind=engine)
-session = Session()
+# Session = sessionmaker(bind=engine)
+# session = Session()
 #
 
 def replace_invalid_characters(path):
@@ -114,6 +113,7 @@ import os
 def file_exists_case_insensitive(id, title, files, extension='pdf'):
     clean_title = '_'.join(re.findall(r'\w+', title))
     file_name_with_suffix = "{}.{}.{}".format(id, clean_title, extension)
+    # file_name_with_suffix = f"{id}.{extension}".lower()
     return file_name_with_suffix in files
 
 
@@ -125,9 +125,9 @@ def redownload(session):
     for row in tqdm(results):
         if row.has_been_downloaded == 0:
             pub_url = row.pub_url
-            id = get_arxiv_id_from_url(pub_url)
+            id = row.id
 
-            file_pth = os.path.join(out_dir, id + '.' + row.title + '.pdf')
+            # file_pth = os.path.join(out_dir, id + '.' + row.title + '.pdf')
              
 
             # print(file_pth)
@@ -173,93 +173,163 @@ def simple_query():
         print('\n\n')
 
 
+# Base.metadata.create_all(engine)
+def get_arxiv_id(entry_id: str) -> str:
+    return entry_id.rsplit("/", 1)[-1]
+
+import csv
+from pathlib import Path
+from arxiv import SortCriterion, SortOrder, Client
 @retry(delay=16)
-def main(session):
+def main(categories=("cs.AI", "cs.CL", "cs.CV"), years=(2022, 2023, 2024), per_year=1333):
     # add or remove kwds if you want
-    key_words = ["Action Detection", "Action Recognition", "Activity Detection", "Activity Recognition", "Adversarial Attack", "Anomaly Detection", "Audio Classification", "Biometric Authentication", "Biometric Identification", "Boundary Detection", "CNN", "Computer Vision", "Contrastive Learning", "Data Mining", "Data Visualization", "Depth Estimation", "Dialogue Modeling", "Dialogue Systems", "Diffusion Model", "Document Analysis", "Document Analysis and Recognition", "Document Clustering", "Document Layout Analysis", "Document Retrieval", "Domain Adaptation", "Edge Detection", "Emotion Recognition", "Facial Recognition", "Face Detection", "Face Recognition", "Gesture Analysis", "Gesture Recognition", "Graph Mining", "Hand Gesture Recognition", "Handwriting Recognition", "Human Activity Recognition", "Human Detection", "Human Pose Estimation", "Image Captioning", "Image Classification", "Image Clustering", "Image Compression", "Image Editing", "Image Enhancement", "Image Generation", "Image Inpainting", "Image Matching", "Image Quality Assessment", "Image Recognition", "Image Reconstruction", "Image Retrieval", "Image Restoration", "Image Segmentation", "Image-Based Localization", "Instance Segmentation", "Knowledge Graph", "Knowledge Representation", "Language Modeling", "Language Modelling", "Machine Learning Interpretability", "Machine Translation", "Medical Image Analysis", "Medical Image Segmentation", "Meta-Learning", "Metric Learning", "Multi-Label Classification", "Named Entity Disambiguation", "Named Entity Recognition", "Natural Language Processing", "Object Detection", "Object Tracking", "Optical Character Recognition", "Pattern Matching", "Pattern Recognition", "Person Re-Identification", "Point Cloud", "Question Answering", "Recommendation Systems", "Recommender Systems", "Relation Extraction", "Remote Sensing", "Representation Learning", "Saliency Detection", "Salient Object Detection", "Scene Segmentation", "Scene Understanding", "Semantic Segmentation", "Sentiment Analysis", "Sentiment Classification", "Signature Verification", "Speech Emotion Recognition", "Speech Enhancement", "Speech Recognition", "Speech Synthesis", "Speech-to-Text Conversion", "Super-Resolution", "Superpixels", "Text Classification", "Text Clustering", "Text Generation", "Text Mining", "Text Summarization", "Text-to-Image Generation", "Text-to-Speech Conversion", "Text-to-Speech Synthesis", "Time Series Analysis", "Time Series Forecasting", "Topic Detection", "Topic Modeling", "Transfer Learning", "Video Object Segmentation", "Video Processing", "Video Summarization", "Video Understanding", "Visual Question Answering", "Visual Tracking", "Word Embeddings", "Zero-Shot Learning"]
-    key_words = []
-    key_words = [i.lower() for i in key_words]
+    # key_words = ["Action Detection", "Action Recognition", "Activity Detection", "Activity Recognition", "Adversarial Attack", "Anomaly Detection", "Audio Classification", "Biometric Authentication", "Biometric Identification", "Boundary Detection", "CNN", "Computer Vision", "Contrastive Learning", "Data Mining", "Data Visualization", "Depth Estimation", "Dialogue Modeling", "Dialogue Systems", "Diffusion Model", "Document Analysis", "Document Analysis and Recognition", "Document Clustering", "Document Layout Analysis", "Document Retrieval", "Domain Adaptation", "Edge Detection", "Emotion Recognition", "Facial Recognition", "Face Detection", "Face Recognition", "Gesture Analysis", "Gesture Recognition", "Graph Mining", "Hand Gesture Recognition", "Handwriting Recognition", "Human Activity Recognition", "Human Detection", "Human Pose Estimation", "Image Captioning", "Image Classification", "Image Clustering", "Image Compression", "Image Editing", "Image Enhancement", "Image Generation", "Image Inpainting", "Image Matching", "Image Quality Assessment", "Image Recognition", "Image Reconstruction", "Image Retrieval", "Image Restoration", "Image Segmentation", "Image-Based Localization", "Instance Segmentation", "Knowledge Graph", "Knowledge Representation", "Language Modeling", "Language Modelling", "Machine Learning Interpretability", "Machine Translation", "Medical Image Analysis", "Medical Image Segmentation", "Meta-Learning", "Metric Learning", "Multi-Label Classification", "Named Entity Disambiguation", "Named Entity Recognition", "Natural Language Processing", "Object Detection", "Object Tracking", "Optical Character Recognition", "Pattern Matching", "Pattern Recognition", "Person Re-Identification", "Point Cloud", "Question Answering", "Recommendation Systems", "Recommender Systems", "Relation Extraction", "Remote Sensing", "Representation Learning", "Saliency Detection", "Salient Object Detection", "Scene Segmentation", "Scene Understanding", "Semantic Segmentation", "Sentiment Analysis", "Sentiment Classification", "Signature Verification", "Speech Emotion Recognition", "Speech Enhancement", "Speech Recognition", "Speech Synthesis", "Speech-to-Text Conversion", "Super-Resolution", "Superpixels", "Text Classification", "Text Clustering", "Text Generation", "Text Mining", "Text Summarization", "Text-to-Image Generation", "Text-to-Speech Conversion", "Text-to-Speech Synthesis", "Time Series Analysis", "Time Series Forecasting", "Topic Detection", "Topic Modeling", "Transfer Learning", "Video Object Segmentation", "Video Processing", "Video Summarization", "Video Understanding", "Visual Question Answering", "Visual Tracking", "Word Embeddings", "Zero-Shot Learning"]
+    # key_words = [i.lower() for i in key_words]
 
-    key_words = list(set(key_words))
-    logger.info(key_words)
-    logger.info(len(key_words))
-    key_words_count = {}
-    error_list = []
+    # key_words = list(set(key_words))
+    # logger.info(key_words)
+    # logger.info(len(key_words))
+    # key_words_count = {}
+    # error_list = []
 
-    for key_word in tqdm(key_words):
-        # Make your own search rules here. Check https://info.arxiv.org/help/api/user-manual.html#query_details for more infomation.
-        # More Examples: query = 'abs:"CLIP" AND abs:"knowledge distillation"'
-        query = f'(ti:"review" OR ti:"survey") AND abs:"{key_word.lower()}"'
-        query = f'car:'
-        logger.info(f'Start query {key_word}')
-        search = arxiv.Search(query=query,
-                              max_results=float('inf'),
-                              sort_by=SortCriterion.Relevance,
-                              sort_order=SortOrder.Descending,
-                              )
+    # for key_word in tqdm(key_words):
+    #     # Make your own search rules here. Check https://info.arxiv.org/help/api/user-manual.html#query_details for more infomation.
+    #     # More Examples: query = 'abs:"CLIP" AND abs:"knowledge distillation"'
+    #     query = f'(ti:"review" OR ti:"survey") AND abs:"{key_word.lower()}"'
+    #     query = 'cat:cs.CV OR cat:cs.CL OR cat:cs.AI AND submittedDate:[20220101 TO 20241231] AND NOT (ti:"review" OR ti:"survey")'
+    #     # query = f'car:'
+    #     logger.info(f'Start query {key_word}')
+    #     search = arxiv.Search(query=query,
+    #                           max_results=10,
+    #                           sort_by=SortCriterion.Relevance,
+    #                           sort_order=SortOrder.Descending,
+    #                           )
 
-        for i, result in enumerate(search.results()):
-            if '/' in result._get_default_filename():
-                if '\\' in result._get_default_filename():
-                    continue
-                continue
+    #     for i, result in enumerate(search.results()):
+    #         if '/' in result._get_default_filename():
+    #             if '\\' in result._get_default_filename():
+    #                 continue
+    #             continue
 
-            if True:  # result.published.year>=2022:
-                print(result._get_default_filename() + ' retrived earlier. Skipping now.')
-                arxiv_paper = Arxiv_paper(result, ref_type='entity')
-                data = session.query(PaperMapping).filter(PaperMapping.id == arxiv_paper.id).first()
+    #         if result.published.year>=2022:
+    #             # print(result._get_default_filename() + ' retrived earlier. no Skipping now.')
+    #             arxiv_paper = Arxiv_paper(result, ref_type='entity')
+    #             data = session.query(PaperMapping).filter(PaperMapping.id == arxiv_paper.id).first()
 
-                if data is None:  # current paper is not in the database
-                    if not os.path.exists(os.path.join(out_dir, result._get_default_filename())):
-                        logger.info(f'{arxiv_paper.id} is not existed in the disk, try downloading it. ')
-                        try:
-                            # result.download_pdf(dirpath=out_dir)
-                            # render_pdf(arxiv_paper.title, 'Industrial Internet of Things', save_path=None)
-                            pass
-                        except URLError:
-                            time.sleep(8)
-                            logger.warning(f'{result._get_default_filename()} download failed.')
-                            error_list.append(result._get_default_filename())
+    #             if data is None:  # current paper is not in the database
+    #                 if not os.path.exists(os.path.join(out_dir, result._get_default_filename())):
+    #                     logger.info(f'{arxiv_paper.id} is not existed in the disk, try downloading it. ')
+    #                     try:
+    #                         result.download_pdf(dirpath=out_dir)
+    #                         # render_pdf(arxiv_paper.title, 'Industrial Internet of Things', save_path=None)
+    #                         pass
+    #                     except URLError:
+    #                         time.sleep(8)
+    #                         logger.warning(f'{result._get_default_filename()} download failed.')
+    #                         error_list.append(result._get_default_filename())
 
-                    doc = PaperMapping(arxiv_paper=arxiv_paper, search_by_keywords=query)
-                     
-                     
-                    session.add(doc)
-                    session.commit()
+    #                 doc = PaperMapping(arxiv_paper=arxiv_paper, search_by_keywords=key_word)
 
-                else:
-                    data.search_by_keywords = query
-                    # # print('done')
-                    session.commit()
+    #                 session.add(doc)
+    #                 session.commit()
 
-                if key_word.lower() not in key_words_count:
-                    key_words_count[f'{key_word.lower()}'] = 1
-                else:
-                    key_words_count[f'{key_word.lower()}'] += 1
+    #             else:
+    #                 data.search_by_keywords = key_word
+    #                 # # print('done')
+    #                 session.commit()
 
-                # print(str(i) + ' ' + result._get_default_filename())
+    #             if key_word.lower() not in key_words_count:
+    #                 key_words_count[f'{key_word.lower()}'] = 1
+    #             else:
+    #                 key_words_count[f'{key_word.lower()}'] += 1
+
+    #             # print(str(i) + ' ' + result._get_default_filename())
+    #         else:
+    #             print(result._get_default_filename() + ' retrived earlier. Skipping now.')
+
+    client = Client(page_size=200, delay_seconds=3)
+    auto_make_directory(out_dir)
+    records_by_year = {year: [] for year in years}
+    for category in categories:
+        for year in years:
+            query = (
+                f'cat:{category} AND submittedDate:[{year}0101 TO {year}1231] '
+                'AND NOT (ti:"review" OR ti:"survey")'
+            )
+            search = arxiv.Search(query=query,
+                            max_results=per_year,
+                            sort_by=SortCriterion.Relevance,
+                            sort_order=SortOrder.Descending,
+                            )
+
+            with tqdm(total=per_year, desc=f"{category}-{year}", unit="paper") as bar:
+                count = 0
+                for result in client.results(search):
+                    if '/' in result._get_default_filename():
+                        if '\\' in result._get_default_filename():
+                            continue
+                        continue
+                    arxiv_id = get_arxiv_id(result.entry_id)
+                    records_by_year[year].append(
+                        {
+                            "arxiv_id": arxiv_id,
+                            "category": category,
+                            "title": result.title,
+                            "abstract": result.summary,
+                            "published": result.published.strftime("%Y-%m-%d"),
+                            "citations": None,
+                        }
+                    )
+                    count += 1
+                    bar.update(1)
+                    if count >= per_year:
+                        break
+
+            logger.info(f"Collected {count} entries for {category} in {year}.")
+
+    fieldnames = ["arxiv_id", "category", "title", "abstract", "published", "citations"]
+    for year, year_records in records_by_year.items():
+        csv_path = Path(out_dir) / f"arxiv_cs_metadata_{year}.csv"
+        if year_records:
+            with csv_path.open("w", newline="", encoding="utf-8") as csv_file:
+                writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(year_records)
+            logger.info(f"Wrote {len(year_records)} records to {csv_path}")
+        else:
+            logger.warning(f"No records collected for {year}.")
+
+    return records_by_year
 
                  
 
     session.close()
-    print(key_words_count)
      
     import json
-    with open("kwd_couont.json", "w") as json_file:
+    with open("./pdf_dir/kwd_count.json", "w") as json_file:
         json.dump(key_words_count, json_file)
     for err in error_list:
         print(err)
 
 
 if __name__ == "__main__":
-    search = arxiv.Search(query=f'cat:"cs"',
-                          max_results=float('inf'),
-                          sort_by=SortCriterion.Relevance,
-                          sort_order=SortOrder.Descending,
-                          )
-    for i, result in enumerate(search.results()):
-        print(result)
-    # main(session)
+    # client = arxiv.Client()  # 新增
+    # search = arxiv.Search(
+    #     query='cat:cs.*',
+    #     max_results=10,
+    #     sort_by=SortCriterion.Relevance,
+    #     sort_order=SortOrder.Descending,
+    # )
+    # for i, result in enumerate(client.results(search)):  # 使用 client.results
+    #     print(f"{i}. {result.title}")
+    #     print(f"   URL: {result.entry_id}")
+    #     print(f"   PDF: {result.pdf_url}")
+    #     print(f"   Authors: {', '.join(author.name for author in result.authors)}")
+    #     print(f"   Published: {result.published:%Y-%m-%d}")
+    #     print(f"   Summary: {result.summary[:200]}...")
+    #     print()
+
+    main()
     # session.expunge_all()
     # redownload(session)
     # simple_query()

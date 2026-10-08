@@ -1,4 +1,3 @@
-
 database/.ppicache.dat
 database/.ppicache.bak
 database/.ppicache.dir
@@ -8,6 +7,9 @@ database/.ppicache.dir
 *.sqlite
 *.pdf
 *.pyc
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store
 config/config.py
 /database/logs
 /runs
@@ -31,3 +33,21 @@ predict_accept.py
 save_models.py
 predict_accept.py
 NAIP.7z
+
+# Local environments and large artifacts
+venv/
+.env
+logs/
+dataset/
+Llama-3.3-8B-Instruct/
+NAIP_local/
+last/
+*.bin
+
+# Local scratch files
+.exit
+.tables
+SELECT
+
+# Generated logs
+v1_resource/TKPD/log/
